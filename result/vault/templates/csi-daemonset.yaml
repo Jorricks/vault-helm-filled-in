@@ -1,0 +1,69 @@
+---
+# Source: vault/templates/csi-daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vault-csi-provider
+  namespace: default
+  labels:
+    app.kubernetes.io/name: vault-csi-provider
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/managed-by: Helm
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault-csi-provider
+      app.kubernetes.io/instance: vault
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault-csi-provider
+        app.kubernetes.io/instance: vault
+    spec:
+      
+      serviceAccountName: vault-csi-provider
+      containers:
+        - name: vault-csi-provider
+          
+          
+          image: "hashicorp/vault-csi-provider:1.2.0"
+          imagePullPolicy: IfNotPresent
+          args:
+            - --endpoint=/provider/vault.sock
+            - --debug=false
+          env:
+            - name: VAULT_ADDR
+              value: http://vault.default.svc:8200
+          volumeMounts:
+            - name: providervol
+              mountPath: "/provider"
+            - name: mountpoint-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: HostToContainer
+          livenessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            failureThreshold: 2
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            failureThreshold: 2
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+      volumes:
+        - name: providervol
+          hostPath:
+            path: /etc/kubernetes/secrets-store-csi-providers
+        - name: mountpoint-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
